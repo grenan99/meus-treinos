@@ -1,27 +1,48 @@
 import React, { useState, useEffect } from 'react';
 
-// Componente de ícones simples (substitui Lucide React)
+// Importar ícones do Lucide
+import { 
+  Calendar, 
+  Clock, 
+  CheckCircle, 
+  Play, 
+  Pause, 
+  Square, 
+  Plus, 
+  Edit, 
+  Trash2, 
+  BarChart3, 
+  Target, 
+  Trophy, 
+  TrendingUp, 
+  Eye, 
+  X, 
+  Dumbbell 
+} from 'lucide-react';
+
+// Componente Icon atualizado
 const Icon = ({ name, className = "h-4 w-4", ...props }) => {
   const icons = {
-    calendar: "📅",
-    clock: "⏰", 
-    check: "✅",
-    play: "▶️",
-    pause: "⏸️",
-    stop: "⏹️",
-    plus: "➕",
-    edit: "✏️",
-    trash: "🗑️",
-    chart: "📊",
-    target: "🎯",
-    trophy: "🏆",
-    trend: "📈",
-    eye: "👁️",
-    x: "❌",
-    dumbbell: "🏋️"
+    calendar: Calendar,
+    clock: Clock,
+    check: CheckCircle,
+    play: Play,
+    pause: Pause,
+    stop: Square,
+    plus: Plus,
+    edit: Edit,
+    trash: Trash2,
+    chart: BarChart3,
+    target: Target,
+    trophy: Trophy,
+    trend: TrendingUp,
+    eye: Eye,
+    x: X,
+    dumbbell: Dumbbell
   };
   
-  return <span className={className} {...props}>{icons[name] || "?"}</span>;
+  const IconComponent = icons[name];
+  return IconComponent ? <IconComponent className={className} {...props} /> : null;
 };
 
 const WorkoutOrganizer = () => {
