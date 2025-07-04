@@ -67,6 +67,8 @@ const WorkoutOrganizer = () => {
   const [selectedDays, setSelectedDays] = useState([]);
   const [selectedAreas, setSelectedAreas] = useState([]);
   const [observations, setObservations] = useState('');
+  const [draggedItem, setDraggedItem] = useState(null);
+  const [draggedOver, setDraggedOver] = useState(null);
 
   const daysOfWeek = [
     { value: 'segunda', label: 'Segunda-feira' },
@@ -344,6 +346,48 @@ const WorkoutOrganizer = () => {
   };
 
   const stats = getWorkoutStats();
+
+  // Drag and Drop functions
+  const handleDragStart = (e, workoutId) => {
+    setDraggedItem(workoutId);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', workoutId);
+  };
+
+  const handleDragOver = (e, workoutId) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDraggedOver(workoutId);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setDraggedOver(null);
+  };
+
+  const handleDrop = (e, targetWorkoutId) => {
+    e.preventDefault();
+    
+    if (draggedItem && draggedItem !== targetWorkoutId) {
+      const draggedIndex = workouts.findIndex(w => w.id === draggedItem);
+      const targetIndex = workouts.findIndex(w => w.id === targetWorkoutId);
+      
+      if (draggedIndex !== -1 && targetIndex !== -1) {
+        const newWorkouts = [...workouts];
+        const [draggedWorkout] = newWorkouts.splice(draggedIndex, 1);
+        newWorkouts.splice(targetIndex, 0, draggedWorkout);
+        setWorkouts(newWorkouts);
+      }
+    }
+    
+    setDraggedItem(null);
+    setDraggedOver(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItem(null);
+    setDraggedOver(null);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -646,27 +690,59 @@ const WorkoutOrganizer = () => {
 
                 <div className="grid gap-4">
                   {workouts.map((workout) => (
-                    <div key={workout.id} className="bg-white border border-gray-200 rounded-lg shadow-sm">
+                    <div 
+                      key={workout.id} 
+                      draggable={true}
+                      onDragStart={(e) => handleDragStart(e, workout.id)}
+                      onDragOver={(e) => handleDragOver(e, workout.id)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, workout.id)}
+                      onDragEnd={handleDragEnd}
+                      className={`bg-white border border-gray-200 rounded-lg shadow-sm transition-all duration-200 cursor-move ${
+                        draggedItem === workout.id 
+                          ? 'opacity-50 scale-95 rotate-2' 
+                          : draggedOver === workout.id 
+                            ? 'border-blue-400 shadow-lg scale-102 border-2' 
+                            : 'hover:shadow-md'
+                      }`}
+                    >
                       <div className="p-4 sm:p-6">
                         <div className="flex items-center justify-between mb-4">
-                          <h3 className="text-lg font-semibold text-gray-900 flex-1 pr-2">{workout.name}</h3>
+                          <div className="flex items-center gap-3 flex-1">
+                            {/* Drag Handle */}
+                            <div className="text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing">
+                              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/>
+                                <path d="M6 6a2 2 0 110-4 2 2 0 010 4zM6 12a2 2 0 110-4 2 2 0 010 4zM6 18a2 2 0 110-4 2 2 0 010 4z"/>
+                                <path d="M14 6a2 2 0 110-4 2 2 0 010 4zM14 12a2 2 0 110-4 2 2 0 010 4zM14 18a2 2 0 110-4 2 2 0 010 4z"/>
+                              </svg>
+                            </div>
+                            <h3 className="text-lg font-semibold text-gray-900 flex-1 pr-2">{workout.name}</h3>
+                          </div>
                           <div className="flex gap-1 sm:gap-2">
                             <button
-                              onClick={() => setExpandedWorkout(expandedWorkout === workout.id ? null : workout.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedWorkout(expandedWorkout === workout.id ? null : workout.id);
+                              }}
                               className="text-gray-400 hover:text-blue-600 p-2 rounded-md hover:bg-gray-50"
                               title="Ver detalhes"
                             >
                               <Icon name="eye" />
                             </button>
                             <button
-                              onClick={() => editWorkout(workout)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                editWorkout(workout);
+                              }}
                               className="text-gray-400 hover:text-blue-600 p-2 rounded-md hover:bg-gray-50"
                               title="Editar"
                             >
                               <Icon name="edit" />
                             </button>
                             <button
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 if (window.confirm('Excluir este treino?')) {
                                   deleteWorkout(workout.id);
                                   if (expandedWorkout === workout.id) {
@@ -713,7 +789,10 @@ const WorkoutOrganizer = () => {
                         </div>
                         
                         <button
-                          onClick={() => startWorkout(workout)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startWorkout(workout);
+                          }}
                           className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-md font-medium transition-colors flex items-center justify-center gap-2"
                         >
                           <Icon name="play" />
