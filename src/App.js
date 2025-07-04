@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-
-// Importar ícones do Lucide
 import { 
   Calendar, 
   Clock, 
@@ -20,7 +18,7 @@ import {
   Dumbbell 
 } from 'lucide-react';
 
-// Componente Icon atualizado
+// Componente Icon com Lucide
 const Icon = ({ name, className = "h-4 w-4", ...props }) => {
   const icons = {
     calendar: Calendar,
@@ -353,8 +351,8 @@ const WorkoutOrganizer = () => {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-3">
-            <div className="h-8 w-8 sm:h-10 sm:w-10 bg-blue-600 rounded-lg flex items-center justify-center text-xl sm:text-2xl">
-              <Icon name="dumbbell" className="h-5 w-5 sm:h-6 sm:w-6" />
+            <div className="h-8 w-8 sm:h-10 sm:w-10 bg-blue-600 rounded-lg flex items-center justify-center">
+              <Icon name="dumbbell" className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
             </div>
             Meus Treinos
           </h1>
@@ -620,8 +618,8 @@ const WorkoutOrganizer = () => {
           <div>
             {workouts.length === 0 ? (
               <div className="text-center py-12">
-                <div className="mx-auto h-16 w-16 sm:h-24 sm:w-24 bg-gray-100 rounded-full flex items-center justify-center mb-4 text-3xl sm:text-4xl">
-                  <Icon name="dumbbell" className="h-8 w-8 sm:h-12 sm:w-12" />
+                <div className="mx-auto h-16 w-16 sm:h-24 sm:w-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                  <Icon name="dumbbell" className="h-8 w-8 sm:h-12 sm:w-12 text-gray-400" />
                 </div>
                 <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum treino criado</h3>
                 <p className="text-gray-500 mb-6">Comece adicionando seu primeiro treino.</p>
@@ -816,7 +814,7 @@ const WorkoutOrganizer = () => {
               <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="h-8 w-8 sm:h-10 sm:w-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <Icon name="target" className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <Icon name="target" className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
                   </div>
                   <h3 className="font-medium text-gray-900 text-sm sm:text-base">Total de Treinos</h3>
                 </div>
@@ -826,7 +824,7 @@ const WorkoutOrganizer = () => {
               <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="h-8 w-8 sm:h-10 sm:w-10 bg-green-100 rounded-lg flex items-center justify-center">
-                    <Icon name="trend" className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <Icon name="trend" className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
                   </div>
                   <h3 className="font-medium text-gray-900 text-sm sm:text-base">Este Mês</h3>
                 </div>
@@ -836,7 +834,7 @@ const WorkoutOrganizer = () => {
               <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="h-8 w-8 sm:h-10 sm:w-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <Icon name="clock" className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <Icon name="clock" className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
                   </div>
                   <h3 className="font-medium text-gray-900 text-sm sm:text-base">Tempo Médio</h3>
                 </div>
