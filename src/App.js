@@ -15,7 +15,12 @@ import {
   TrendingUp, 
   Eye, 
   X, 
-  Dumbbell 
+  Dumbbell,
+  Share2,
+  Download,
+  Copy,
+  Check,
+  Minus
 } from 'lucide-react';
 
 // Componente Icon com Lucide
@@ -36,7 +41,11 @@ const Icon = ({ name, className = "h-4 w-4", ...props }) => {
     trend: TrendingUp,
     eye: Eye,
     x: X,
-    dumbbell: Dumbbell
+    dumbbell: Dumbbell,
+    share: Share2,
+    download: Download,
+    copy: Copy,
+    minus: Minus
   };
   
   const IconComponent = icons[name];
@@ -58,15 +67,26 @@ const WorkoutOrganizer = () => {
   const [timer, setTimer] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [currentView, setCurrentView] = useState('workouts');
-  const [newWorkoutText, setNewWorkoutText] = useState('');
   const [editingWorkout, setEditingWorkout] = useState(null);
   const [expandedWorkout, setExpandedWorkout] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareCode, setShareCode] = useState('');
+  const [importCode, setImportCode] = useState('');
+  const [copiedCode, setCopiedCode] = useState(false);
   
   // Form fields
   const [selectedDays, setSelectedDays] = useState([]);
   const [selectedAreas, setSelectedAreas] = useState([]);
   const [observations, setObservations] = useState('');
+  const [exercises, setExercises] = useState([{
+    id: Date.now(),
+    name: '',
+    series: 0,
+    repetitions: 0,
+    observation: ''
+  }]);
   const [draggedItem, setDraggedItem] = useState(null);
   const [draggedOver, setDraggedOver] = useState(null);
 
@@ -118,63 +138,6 @@ const WorkoutOrganizer = () => {
     return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Parse workout text
-  const parseWorkoutText = (text) => {
-    const lines = text.split('\n').filter(line => line.trim());
-    const exercises = [];
-
-    lines.forEach(line => {
-      line = line.trim();
-      const exerciseMatch = line.match(/^(\d+)[-\.\)]\s*(.*)/);
-      
-      if (exerciseMatch) {
-        const fullText = exerciseMatch[2];
-        let exerciseName = '';
-        let seriesInfo = '';
-        
-        const seriesPatterns = [
-          /(\d+\s+séries?)/i,
-          /(\d+\s+series?)/i,
-          /(\d+x\d+)/i,
-          /(\d+\s*x\s*\d+)/i
-        ];
-        
-        let foundSeriesAt = -1;
-        
-        for (let pattern of seriesPatterns) {
-          const match = fullText.match(pattern);
-          if (match) {
-            foundSeriesAt = fullText.indexOf(match[0]);
-            break;
-          }
-        }
-        
-        if (foundSeriesAt !== -1) {
-          exerciseName = fullText.substring(0, foundSeriesAt).replace(/\s*-\s*$/, '').trim();
-          seriesInfo = fullText.substring(foundSeriesAt).trim();
-        } else {
-          exerciseName = fullText.trim();
-        }
-        
-        const exercise = {
-          id: Date.now() + Math.random(),
-          name: exerciseName,
-          sets: seriesInfo ? [{
-            id: Date.now() + Math.random(),
-            description: seriesInfo,
-            completed: false
-          }] : [],
-          completed: false,
-          notes: seriesInfo
-        };
-        
-        exercises.push(exercise);
-      }
-    });
-
-    return exercises;
-  };
-
   // Generate workout name
   const generateWorkoutName = (areas) => {
     if (areas.length === 0) return 'Treino';
@@ -184,29 +147,157 @@ const WorkoutOrganizer = () => {
     return `Treino de ${areaLabels.join(', ')}`;
   };
 
+  // Generate share code
+  const generateShareCode = (workout) => {
+    const workoutData = {
+      name: workout.name,
+      areas: workout.areas,
+      days: workout.days,
+      exercises: workout.exercises.map(ex => ({
+        name: ex.name,
+        series: ex.series || 0,
+        repetitions: ex.repetitions || 0,
+        observation: ex.observation || '',
+        notes: ex.notes || ''
+      })),
+      observations: workout.observations
+    };
+    
+    const jsonString = JSON.stringify(workoutData);
+    const base64 = btoa(encodeURIComponent(jsonString));
+    return base64;
+  };
+
+  // Decode share code
+  const decodeShareCode = (code) => {
+    try {
+      const jsonString = decodeURIComponent(atob(code));
+      const workoutData = JSON.parse(jsonString);
+      return workoutData;
+    } catch (error) {
+      console.error('Error decoding share code:', error);
+      return null;
+    }
+  };
+
+  // Handle share workout
+  const handleShareWorkout = (workout) => {
+    const code = generateShareCode(workout);
+    setShareCode(code);
+    setShowShareModal(true);
+    setCopiedCode(false);
+  };
+
+  // Handle copy code
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(shareCode);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  };
+
+  // Handle import workout
+  const handleImportWorkout = () => {
+    const workoutData = decodeShareCode(importCode);
+    if (workoutData) {
+      const newWorkout = {
+        id: Date.now(),
+        ...workoutData,
+        date: new Date().toISOString().split('T')[0],
+        exercises: workoutData.exercises.map(ex => ({
+          ...ex,
+          id: Date.now() + Math.random(),
+          completed: false,
+          sets: ex.series > 0 ? [{
+            id: Date.now() + Math.random(),
+            description: `${ex.series} séries x ${ex.repetitions} repetições`,
+            completed: false
+          }] : []
+        }))
+      };
+      
+      setWorkouts([...workouts, newWorkout]);
+      setImportCode('');
+      setShowImportModal(false);
+    } else {
+      alert('Código inválido! Verifique e tente novamente.');
+    }
+  };
+
   // Clear form
   const clearForm = () => {
-    setNewWorkoutText('');
     setSelectedDays([]);
     setSelectedAreas([]);
     setObservations('');
+    setExercises([{
+      id: Date.now(),
+      name: '',
+      series: 0,
+      repetitions: 0,
+      observation: ''
+    }]);
     setEditingWorkout(null);
     setShowAddModal(false);
   };
 
+  // Add exercise to form
+  const addExercise = () => {
+    setExercises([...exercises, {
+      id: Date.now(),
+      name: '',
+      series: 0,
+      repetitions: 0,
+      observation: ''
+    }]);
+  };
+
+  // Remove exercise from form
+  const removeExercise = (exerciseId) => {
+    if (exercises.length > 1) {
+      setExercises(exercises.filter(ex => ex.id !== exerciseId));
+    }
+  };
+
+  // Update exercise in form
+  const updateExercise = (exerciseId, field, value) => {
+    setExercises(exercises.map(ex => 
+      ex.id === exerciseId ? { ...ex, [field]: value } : ex
+    ));
+  };
+
+  // Increment/Decrement exercise values
+  const incrementValue = (exerciseId, field) => {
+    setExercises(exercises.map(ex => 
+      ex.id === exerciseId ? { ...ex, [field]: Math.max(0, (ex[field] || 0) + 1) } : ex
+    ));
+  };
+
+  const decrementValue = (exerciseId, field) => {
+    setExercises(exercises.map(ex => 
+      ex.id === exerciseId ? { ...ex, [field]: Math.max(0, (ex[field] || 0) - 1) } : ex
+    ));
+  };
+
   // Add workout
   const addWorkout = () => {
-    if (!newWorkoutText.trim() || selectedAreas.length === 0) return;
+    if (selectedAreas.length === 0 || !exercises.some(ex => ex.name.trim())) return;
     
-    const exercises = parseWorkoutText(newWorkoutText);
+    const validExercises = exercises.filter(ex => ex.name.trim());
     const workoutName = generateWorkoutName(selectedAreas);
     
     const newWorkout = {
       id: Date.now(),
       name: workoutName,
       date: new Date().toISOString().split('T')[0],
-      exercises: exercises,
-      rawText: newWorkoutText,
+      exercises: validExercises.map(ex => ({
+        ...ex,
+        completed: false,
+        sets: ex.series > 0 ? [{
+          id: Date.now() + Math.random(),
+          description: `${ex.series} séries x ${ex.repetitions} repetições`,
+          completed: false
+        }] : [],
+        notes: ex.observation
+      })),
       days: selectedDays,
       areas: selectedAreas,
       observations: observations
@@ -268,25 +359,39 @@ const WorkoutOrganizer = () => {
   // Edit workout
   const editWorkout = (workout) => {
     setEditingWorkout(workout);
-    setNewWorkoutText(workout.rawText);
     setSelectedDays(workout.days || []);
     setSelectedAreas(workout.areas || []);
     setObservations(workout.observations || '');
+    setExercises(workout.exercises.map(ex => ({
+      id: ex.id,
+      name: ex.name,
+      series: ex.series || (ex.sets && ex.sets[0] ? parseInt(ex.sets[0].description.match(/\d+/)?.[0] || 0) : 0),
+      repetitions: ex.repetitions || (ex.sets && ex.sets[0] ? parseInt(ex.sets[0].description.match(/x\s*(\d+)/)?.[1] || 0) : 0),
+      observation: ex.observation || ex.notes || ''
+    })));
     setShowAddModal(true);
   };
 
   // Save edited workout
   const saveEditedWorkout = () => {
-    if (!editingWorkout || !newWorkoutText.trim() || selectedAreas.length === 0) return;
+    if (!editingWorkout || selectedAreas.length === 0 || !exercises.some(ex => ex.name.trim())) return;
     
-    const exercises = parseWorkoutText(newWorkoutText);
+    const validExercises = exercises.filter(ex => ex.name.trim());
     const workoutName = generateWorkoutName(selectedAreas);
     
     const updatedWorkout = {
       ...editingWorkout,
       name: workoutName,
-      exercises: exercises,
-      rawText: newWorkoutText,
+      exercises: validExercises.map(ex => ({
+        ...ex,
+        completed: false,
+        sets: ex.series > 0 ? [{
+          id: Date.now() + Math.random(),
+          description: `${ex.series} séries x ${ex.repetitions} repetições`,
+          completed: false
+        }] : [],
+        notes: ex.observation
+      })),
       days: selectedDays,
       areas: selectedAreas,
       observations: observations
@@ -546,17 +651,114 @@ const WorkoutOrganizer = () => {
                     </div>
                   </div>
 
-                  {/* Workout Text */}
+                  {/* Exercises */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Exercícios do Treino *
                     </label>
-                    <textarea
-                      value={newWorkoutText}
-                      onChange={(e) => setNewWorkoutText(e.target.value)}
-                      placeholder="Cole aqui o texto do treino..."
-                      className="w-full h-32 p-3 border border-gray-300 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-600"
-                    />
+                    <div className="space-y-4">
+                      {exercises.map((exercise, index) => (
+                        <div key={exercise.id} className="border border-gray-200 rounded-md p-4 bg-gray-50">
+                          <div className="space-y-4">
+                            {/* Exercise Name */}
+                            <div>
+                              <input
+                                type="text"
+                                value={exercise.name}
+                                onChange={(e) => updateExercise(exercise.id, 'name', e.target.value)}
+                                placeholder="Nome do exercício"
+                                className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-600"
+                              />
+                            </div>
+
+                            {/* Series and Repetitions */}
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-xs text-gray-600 mb-1">Quantidade de Séries</label>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => decrementValue(exercise.id, 'series')}
+                                    className="p-2 border border-gray-300 rounded-md hover:bg-gray-100"
+                                  >
+                                    <Icon name="minus" className="h-4 w-4" />
+                                  </button>
+                                  <input
+                                    type="number"
+                                    value={exercise.series}
+                                    onChange={(e) => updateExercise(exercise.id, 'series', parseInt(e.target.value) || 0)}
+                                    className="w-16 text-center p-2 border border-gray-300 rounded-md"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => incrementValue(exercise.id, 'series')}
+                                    className="p-2 border border-gray-300 rounded-md hover:bg-gray-100"
+                                  >
+                                    <Icon name="plus" className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="block text-xs text-gray-600 mb-1">Repetições por série</label>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => decrementValue(exercise.id, 'repetitions')}
+                                    className="p-2 border border-gray-300 rounded-md hover:bg-gray-100"
+                                  >
+                                    <Icon name="minus" className="h-4 w-4" />
+                                  </button>
+                                  <input
+                                    type="number"
+                                    value={exercise.repetitions}
+                                    onChange={(e) => updateExercise(exercise.id, 'repetitions', parseInt(e.target.value) || 0)}
+                                    className="w-16 text-center p-2 border border-gray-300 rounded-md"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => incrementValue(exercise.id, 'repetitions')}
+                                    className="p-2 border border-gray-300 rounded-md hover:bg-gray-100"
+                                  >
+                                    <Icon name="plus" className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Exercise Observation */}
+                            <div>
+                              <input
+                                type="text"
+                                value={exercise.observation}
+                                onChange={(e) => updateExercise(exercise.id, 'observation', e.target.value)}
+                                placeholder="Observação do exercício"
+                                className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-600"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Remove Exercise Button */}
+                          {exercises.length > 1 && (
+                            <button
+                              onClick={() => removeExercise(exercise.id)}
+                              className="mt-3 text-red-600 text-sm hover:text-red-700"
+                            >
+                              Remover exercício
+                            </button>
+                          )}
+                        </div>
+                      ))}
+
+                      {/* Add Exercise Button */}
+                      <button
+                        onClick={addExercise}
+                        className="w-full py-3 border-2 border-dashed border-gray-300 rounded-md text-gray-600 hover:border-gray-400 hover:text-gray-700 flex items-center justify-center gap-2"
+                      >
+                        <Icon name="plus" />
+                        Adicionar exercício
+                      </button>
+                    </div>
                   </div>
 
                   {/* Observations */}
@@ -573,396 +775,3 @@ const WorkoutOrganizer = () => {
                   </div>
                 </div>
               </div>
-
-              {/* Footer */}
-              <div className="flex gap-3 p-4 sm:p-6 border-t border-gray-200 flex-shrink-0">
-                <button
-                  onClick={editingWorkout ? saveEditedWorkout : addWorkout}
-                  disabled={selectedAreas.length === 0 || !newWorkoutText.trim()}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white px-4 py-3 rounded-md font-medium transition-colors flex items-center justify-center gap-2"
-                >
-                  <Icon name="plus" />
-                  {editingWorkout ? 'Salvar' : 'Adicionar'}
-                </button>
-                <button
-                  onClick={clearForm}
-                  className="px-4 py-3 border border-gray-300 text-gray-700 rounded-md font-medium hover:bg-gray-50 transition-colors"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Active Workout */}
-        {currentView === 'active' && activeWorkout && (
-          <div className="space-y-4 sm:space-y-6">
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 sm:p-6 rounded-lg">
-              <h2 className="text-xl sm:text-2xl font-semibold mb-4">{activeWorkout.name}</h2>
-              <div className="flex items-center justify-between">
-                <div className="text-2xl sm:text-3xl font-mono">{formatTime(timer)}</div>
-                <div className="flex gap-2 sm:gap-3">
-                  <button
-                    onClick={() => setIsRunning(!isRunning)}
-                    className="bg-white/20 hover:bg-white/30 px-3 sm:px-4 py-2 rounded-md flex items-center gap-2 text-sm sm:text-base"
-                  >
-                    <Icon name={isRunning ? "pause" : "play"} />
-                    {isRunning ? 'Pausar' : 'Continuar'}
-                  </button>
-                  <button
-                    onClick={finishWorkout}
-                    className="bg-red-600 hover:bg-red-700 px-3 sm:px-4 py-2 rounded-md flex items-center gap-2 text-sm sm:text-base"
-                  >
-                    <Icon name="stop" />
-                    Finalizar
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              {activeWorkout.exercises.map((exercise, index) => (
-                <div key={exercise.id} className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
-                  <div className="flex items-start justify-between mb-4 gap-3">
-                    <h3 className="font-semibold text-base sm:text-lg text-gray-900 flex-1">
-                      {index + 1}. {exercise.name}
-                    </h3>
-                    <button
-                      onClick={() => toggleExerciseCompletion(exercise.id)}
-                      className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-md font-medium transition-colors text-sm ${
-                        exercise.completed 
-                          ? 'bg-green-600 text-white' 
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      <Icon name="check" />
-                      {exercise.completed ? 'Feito' : 'Marcar'}
-                    </button>
-                  </div>
-                  
-                  {exercise.sets.length > 0 && (
-                    <div className="space-y-2">
-                      <span className="text-sm font-medium text-gray-700">Informações:</span>
-                      {exercise.sets.map((set) => (
-                        <div key={set.id} className="text-sm text-gray-600 bg-gray-50 p-3 rounded-md">
-                          {set.description}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Workouts View */}
-        {currentView === 'workouts' && (
-          <div>
-            {workouts.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="mx-auto h-16 w-16 sm:h-24 sm:w-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                  <Icon name="dumbbell" className="h-8 w-8 sm:h-12 sm:w-12 text-gray-400" />
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum treino criado</h3>
-                <p className="text-gray-500 mb-6">Comece adicionando seu primeiro treino.</p>
-                <button
-                  onClick={() => setShowAddModal(true)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-md font-medium transition-colors flex items-center gap-2 mx-auto"
-                >
-                  <Icon name="plus" />
-                  Adicionar Treino
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-xl font-semibold text-gray-900">Meus Treinos</h2>
-                  <button
-                    onClick={() => setShowAddModal(true)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-4 py-2 rounded-md font-medium transition-colors flex items-center gap-2 text-sm sm:text-base"
-                  >
-                    <Icon name="plus" />
-                    Adicionar
-                  </button>
-                </div>
-
-                <div className="grid gap-4">
-                  {workouts.map((workout) => (
-                    <div 
-                      key={workout.id} 
-                      draggable={true}
-                      onDragStart={(e) => handleDragStart(e, workout.id)}
-                      onDragOver={(e) => handleDragOver(e, workout.id)}
-                      onDragLeave={handleDragLeave}
-                      onDrop={(e) => handleDrop(e, workout.id)}
-                      onDragEnd={handleDragEnd}
-                      className={`bg-white border border-gray-200 rounded-lg shadow-sm transition-all duration-200 cursor-move ${
-                        draggedItem === workout.id 
-                          ? 'opacity-50 scale-95 rotate-2' 
-                          : draggedOver === workout.id 
-                            ? 'border-blue-400 shadow-lg scale-102 border-2' 
-                            : 'hover:shadow-md'
-                      }`}
-                    >
-                      <div className="p-4 sm:p-6">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center gap-3 flex-1">
-                            {/* Drag Handle */}
-                            <div className="text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing">
-                              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/>
-                                <path d="M6 6a2 2 0 110-4 2 2 0 010 4zM6 12a2 2 0 110-4 2 2 0 010 4zM6 18a2 2 0 110-4 2 2 0 010 4z"/>
-                                <path d="M14 6a2 2 0 110-4 2 2 0 010 4zM14 12a2 2 0 110-4 2 2 0 010 4zM14 18a2 2 0 110-4 2 2 0 010 4z"/>
-                              </svg>
-                            </div>
-                            <h3 className="text-lg font-semibold text-gray-900 flex-1 pr-2">{workout.name}</h3>
-                          </div>
-                          <div className="flex gap-1 sm:gap-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setExpandedWorkout(expandedWorkout === workout.id ? null : workout.id);
-                              }}
-                              className="text-gray-400 hover:text-blue-600 p-2 rounded-md hover:bg-gray-50"
-                              title="Ver detalhes"
-                            >
-                              <Icon name="eye" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                editWorkout(workout);
-                              }}
-                              className="text-gray-400 hover:text-blue-600 p-2 rounded-md hover:bg-gray-50"
-                              title="Editar"
-                            >
-                              <Icon name="edit" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (window.confirm('Excluir este treino?')) {
-                                  deleteWorkout(workout.id);
-                                  if (expandedWorkout === workout.id) {
-                                    setExpandedWorkout(null);
-                                  }
-                                }
-                              }}
-                              className="text-gray-400 hover:text-red-600 p-2 rounded-md hover:bg-gray-50"
-                              title="Excluir"
-                            >
-                              <Icon name="trash" />
-                            </button>
-                          </div>
-                        </div>
-                        
-                        <div className="space-y-3 mb-4">
-                          <div className="flex flex-wrap gap-2">
-                            <span className="text-sm font-medium text-gray-700">Áreas:</span>
-                            <div className="flex flex-wrap gap-1">
-                              {workout.areas?.map(area => (
-                                <span key={area} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
-                                  {bodyAreas.find(ba => ba.value === area)?.label}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                          
-                          {workout.days && workout.days.length > 0 && (
-                            <div className="flex flex-wrap gap-2">
-                              <span className="text-sm font-medium text-gray-700">Dias:</span>
-                              <div className="flex flex-wrap gap-1">
-                                {workout.days.map(day => (
-                                  <span key={day} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-100 text-green-800">
-                                    {daysOfWeek.find(d => d.value === day)?.label}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          
-                          <div className="text-sm text-gray-600">
-                            <span className="font-medium">Exercícios:</span> {workout.exercises.length}
-                          </div>
-                        </div>
-                        
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            startWorkout(workout);
-                          }}
-                          className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-md font-medium transition-colors flex items-center justify-center gap-2"
-                        >
-                          <Icon name="play" />
-                          Iniciar Treino
-                        </button>
-                      </div>
-
-                      {expandedWorkout === workout.id && (
-                        <div className="border-t border-gray-200 bg-gray-50">
-                          <div className="p-4 sm:p-6">
-                            {workout.observations && (
-                              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
-                                <h4 className="text-sm font-medium text-blue-800 mb-2">Observações:</h4>
-                                <p className="text-sm text-blue-700">{workout.observations}</p>
-                              </div>
-                            )}
-
-                            <div>
-                              <h4 className="text-base font-semibold text-gray-900 mb-4">
-                                Exercícios ({workout.exercises.length})
-                              </h4>
-                              <div className="space-y-4">
-                                {workout.exercises.map((exercise, index) => (
-                                  <div key={exercise.id} className="text-sm">
-                                    <div className="font-medium text-gray-900 mb-1">
-                                      {index + 1}. {exercise.name}
-                                    </div>
-                                    {exercise.sets.length > 0 && (
-                                      <div className="text-gray-600 ml-4">
-                                        {exercise.sets.map((set) => (
-                                          <div key={set.id}>
-                                            • {set.description}
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Calendar View */}
-        {currentView === 'calendar' && (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-semibold text-gray-900">Calendário de Treinos</h2>
-            <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
-              <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-4">
-                {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
-                  <div key={day} className="text-center font-medium text-gray-700 p-2 text-xs sm:text-sm">
-                    {day}
-                  </div>
-                ))}
-              </div>
-              
-              <div className="grid grid-cols-7 gap-1 sm:gap-2">
-                {Array.from({ length: 35 }, (_, i) => {
-                  const date = new Date();
-                  date.setDate(date.getDate() - date.getDay() + i - 14);
-                  const dateStr = date.toISOString().split('T')[0];
-                  const hasWorkout = completedWorkouts.some(w => 
-                    w.completedAt.split('T')[0] === dateStr
-                  );
-                  
-                  return (
-                    <div
-                      key={i}
-                      className={`aspect-square p-1 sm:p-2 rounded-md flex items-center justify-center text-xs sm:text-sm font-medium transition-colors ${
-                        hasWorkout 
-                          ? 'bg-green-600 text-white' 
-                          : 'bg-gray-50 border border-gray-200 text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      {date.getDate()}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Stats View */}
-        {currentView === 'stats' && (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-semibold text-gray-900">Relatórios e Estatísticas</h2>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-              <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="h-8 w-8 sm:h-10 sm:w-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <Icon name="target" className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
-                  </div>
-                  <h3 className="font-medium text-gray-900 text-sm sm:text-base">Total de Treinos</h3>
-                </div>
-                <p className="text-xl sm:text-2xl font-bold text-blue-600">{stats.totalWorkouts}</p>
-              </div>
-              
-              <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="h-8 w-8 sm:h-10 sm:w-10 bg-green-100 rounded-lg flex items-center justify-center">
-                    <Icon name="trend" className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
-                  </div>
-                  <h3 className="font-medium text-gray-900 text-sm sm:text-base">Este Mês</h3>
-                </div>
-                <p className="text-xl sm:text-2xl font-bold text-green-600">{stats.thisMonthWorkouts}</p>
-              </div>
-              
-              <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="h-8 w-8 sm:h-10 sm:w-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <Icon name="clock" className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
-                  </div>
-                  <h3 className="font-medium text-gray-900 text-sm sm:text-base">Tempo Médio</h3>
-                </div>
-                <p className="text-xl sm:text-2xl font-bold text-purple-600">{formatTime(stats.avgDuration)}</p>
-              </div>
-            </div>
-
-            {/* Exercise frequency */}
-            <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Exercícios Mais Realizados</h3>
-              <div className="space-y-3">
-                {Object.entries(stats.exerciseStats)
-                  .sort(([,a], [,b]) => b - a)
-                  .slice(0, 10)
-                  .map(([exercise, count]) => (
-                    <div key={exercise} className="flex justify-between items-center py-2">
-                      <span className="text-gray-700 text-sm sm:text-base pr-2">{exercise}</span>
-                      <span className="font-semibold text-blue-600 bg-blue-50 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm">
-                        {count}x
-                      </span>
-                    </div>
-                  ))}
-              </div>
-            </div>
-
-            {/* Recent workouts */}
-            <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Últimos Treinos</h3>
-              <div className="space-y-3">
-                {completedWorkouts.slice(-5).reverse().map((workout) => (
-                  <div key={workout.id} className="flex justify-between items-center p-3 sm:p-4 bg-gray-50 rounded-lg">
-                    <div className="flex-1 pr-2">
-                      <p className="font-medium text-gray-900 text-sm sm:text-base">{workout.name}</p>
-                      <p className="text-xs sm:text-sm text-gray-500">
-                        {new Date(workout.completedAt).toLocaleDateString('pt-BR')}
-                      </p>
-                    </div>
-                    <span className="text-xs sm:text-sm font-medium text-blue-600 bg-blue-50 px-2 sm:px-3 py-1 rounded-full">
-                      {formatTime(workout.duration)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-export default WorkoutOrganizer;
