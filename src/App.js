@@ -494,6 +494,331 @@ const WorkoutOrganizer = () => {
     setDraggedOver(null);
   };
 
+  // Calendar View Component
+  const CalendarView = ({ completedWorkouts, bodyAreas }) => {
+    const [currentMonth, setCurrentMonth] = useState(new Date());
+    const [selectedWorkout, setSelectedWorkout] = useState(null);
+    const [showWorkoutModal, setShowWorkoutModal] = useState(false);
+
+    const monthNames = [
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+
+    const getAreaColor = (area) => {
+      const colors = {
+        peito: 'bg-red-500',
+        triceps: 'bg-orange-500',
+        biceps: 'bg-yellow-500',
+        costas: 'bg-green-500',
+        quadriceps: 'bg-blue-500',
+        posterior: 'bg-indigo-500',
+        ombro: 'bg-purple-500'
+      };
+      return colors[area] || 'bg-gray-500';
+    };
+
+    const getDaysInMonth = (date) => {
+      const year = date.getFullYear();
+      const month = date.getMonth();
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+      const daysInMonth = lastDay.getDate();
+      const startingDayOfWeek = firstDay.getDay();
+      
+      const days = [];
+      
+      // Add previous month days
+      const prevMonthLastDay = new Date(year, month, 0).getDate();
+      for (let i = startingDayOfWeek - 1; i >= 0; i--) {
+        days.push({
+          day: prevMonthLastDay - i,
+          isCurrentMonth: false,
+          isPrevMonth: true,
+          date: new Date(year, month - 1, prevMonthLastDay - i)
+        });
+      }
+      
+      // Add current month days
+      for (let i = 1; i <= daysInMonth; i++) {
+        days.push({
+          day: i,
+          isCurrentMonth: true,
+          isPrevMonth: false,
+          date: new Date(year, month, i)
+        });
+      }
+      
+      // Add next month days
+      const remainingDays = 42 - days.length; // 6 weeks * 7 days
+      for (let i = 1; i <= remainingDays; i++) {
+        days.push({
+          day: i,
+          isCurrentMonth: false,
+          isPrevMonth: false,
+          date: new Date(year, month + 1, i)
+        });
+      }
+      
+      return days;
+    };
+
+    const isToday = (date) => {
+      const today = new Date();
+      return date.toDateString() === today.toDateString();
+    };
+
+    const getWorkoutsForDate = (date) => {
+      const dateStr = date.toISOString().split('T')[0];
+      return completedWorkouts.filter(w => w.completedAt.split('T')[0] === dateStr);
+    };
+
+    const navigateMonth = (direction) => {
+      setCurrentMonth(prev => {
+        const newDate = new Date(prev);
+        newDate.setMonth(prev.getMonth() + direction);
+        return newDate;
+      });
+    };
+
+    const handleDayClick = (dayInfo) => {
+      const workouts = getWorkoutsForDate(dayInfo.date);
+      if (workouts.length > 0) {
+        setSelectedWorkout({
+          date: dayInfo.date,
+          workouts: workouts
+        });
+        setShowWorkoutModal(true);
+      }
+    };
+
+    const getMonthStats = () => {
+      const year = currentMonth.getFullYear();
+      const month = currentMonth.getMonth();
+      const monthWorkouts = completedWorkouts.filter(w => {
+        const date = new Date(w.completedAt);
+        return date.getMonth() === month && date.getFullYear() === year;
+      });
+      
+      // Calculate streak
+      let currentStreak = 0;
+      const today = new Date();
+      let checkDate = new Date(today);
+      
+      while (true) {
+        const dateStr = checkDate.toISOString().split('T')[0];
+        const hasWorkout = completedWorkouts.some(w => w.completedAt.split('T')[0] === dateStr);
+        
+        if (hasWorkout) {
+          currentStreak++;
+          checkDate.setDate(checkDate.getDate() - 1);
+        } else if (checkDate.toDateString() === today.toDateString()) {
+          checkDate.setDate(checkDate.getDate() - 1);
+        } else {
+          break;
+        }
+      }
+      
+      return {
+        total: monthWorkouts.length,
+        streak: currentStreak
+      };
+    };
+
+    const stats = getMonthStats();
+    const days = getDaysInMonth(currentMonth);
+
+    return (
+      <>
+        <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
+            <button
+              onClick={() => navigateMonth(-1)}
+              className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+            >
+              <svg className="h-5 w-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            
+            <div className="text-center">
+              <h2 className="text-xl font-semibold text-gray-900">
+                {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+              </h2>
+              <div className="flex items-center justify-center gap-4 mt-2 text-sm text-gray-600">
+                <span className="flex items-center gap-1">
+                  <Icon name="target" className="h-4 w-4" />
+                  {stats.total} treinos
+                </span>
+                <span className="flex items-center gap-1">
+                  <Icon name="trophy" className="h-4 w-4" />
+                  {stats.streak} dias seguidos
+                </span>
+              </div>
+            </div>
+            
+            <button
+              onClick={() => navigateMonth(1)}
+              className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+            >
+              <svg className="h-5 w-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Days of week header */}
+          <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2">
+            {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day, index) => (
+              <div 
+                key={day} 
+                className={`text-center font-medium p-2 text-xs sm:text-sm ${
+                  index === 0 || index === 6 ? 'text-gray-500' : 'text-gray-700'
+                }`}
+              >
+                {day}
+              </div>
+            ))}
+          </div>
+          
+          {/* Calendar grid */}
+          <div className="grid grid-cols-7 gap-1 sm:gap-2">
+            {days.map((dayInfo, index) => {
+              const workouts = getWorkoutsForDate(dayInfo.date);
+              const isWeekend = dayInfo.date.getDay() === 0 || dayInfo.date.getDay() === 6;
+              const hasWorkout = workouts.length > 0;
+              const isTodayDate = isToday(dayInfo.date);
+              
+              return (
+                <div
+                  key={index}
+                  onClick={() => handleDayClick(dayInfo)}
+                  className={`
+                    aspect-square p-1 sm:p-2 rounded-md flex flex-col items-center justify-center 
+                    text-xs sm:text-sm font-medium transition-all relative group
+                    ${!dayInfo.isCurrentMonth ? 'text-gray-400' : 'text-gray-700'}
+                    ${isWeekend && dayInfo.isCurrentMonth ? 'bg-gray-50' : ''}
+                    ${hasWorkout ? 'cursor-pointer hover:shadow-md' : ''}
+                    ${isTodayDate ? 'ring-2 ring-blue-500 ring-inset' : ''}
+                    ${dayInfo.isCurrentMonth && !hasWorkout ? 'hover:bg-gray-100' : ''}
+                  `}
+                >
+                  <span className={`${isTodayDate ? 'font-bold text-blue-600' : ''}`}>
+                    {dayInfo.day}
+                  </span>
+                  
+                  {hasWorkout && dayInfo.isCurrentMonth && (
+                    <div className="absolute bottom-1 left-1 right-1 flex gap-0.5 justify-center flex-wrap">
+                      {workouts.map((workout, wIndex) => (
+                        <div key={wIndex} className="flex gap-0.5">
+                          {workout.areas?.slice(0, 3).map((area, aIndex) => (
+                            <div
+                              key={aIndex}
+                              className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${getAreaColor(area)}`}
+                              title={bodyAreas.find(ba => ba.value === area)?.label}
+                            />
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {hasWorkout && (
+                    <div className="hidden group-hover:block absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 
+                                    bg-gray-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10">
+                      {workouts.length} treino{workouts.length > 1 ? 's' : ''}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Legend */}
+          <div className="mt-6 pt-4 border-t border-gray-200">
+            <h3 className="text-sm font-medium text-gray-700 mb-3">Legenda de Áreas</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {bodyAreas.map(area => (
+                <div key={area.value} className="flex items-center gap-2 text-xs">
+                  <div className={`w-3 h-3 rounded-full ${getAreaColor(area.value)}`} />
+                  <span className="text-gray-600">{area.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Workout Details Modal */}
+        {showWorkoutModal && selectedWorkout && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg max-w-md w-full max-h-[80vh] overflow-hidden flex flex-col">
+              <div className="p-4 sm:p-6 border-b border-gray-200">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Treinos do dia
+                    </h3>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {selectedWorkout.date.toLocaleDateString('pt-BR', { 
+                        weekday: 'long', 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      })}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowWorkoutModal(false)}
+                    className="text-gray-400 hover:text-gray-600 p-1"
+                  >
+                    <Icon name="x" className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+                <div className="space-y-4">
+                  {selectedWorkout.workouts.map((workout, index) => (
+                    <div key={index} className="bg-gray-50 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-medium text-gray-900">{workout.name}</h4>
+                        <span className="text-sm text-gray-600">
+                          {formatTime(workout.duration)}
+                        </span>
+                      </div>
+                      
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {workout.areas?.map(area => (
+                          <span 
+                            key={area} 
+                            className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium text-white ${getAreaColor(area)}`}
+                          >
+                            {bodyAreas.find(ba => ba.value === area)?.label}
+                          </span>
+                        ))}
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <h5 className="text-sm font-medium text-gray-700">Exercícios realizados:</h5>
+                        {workout.exercises.filter(ex => ex.completed).map((exercise, exIndex) => (
+                          <div key={exIndex} className="text-sm text-gray-600 flex items-center gap-2">
+                            <Icon name="check" className="h-3 w-3 text-green-600" />
+                            {exercise.name}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-6xl mx-auto p-4 sm:p-6">
@@ -1109,40 +1434,10 @@ const WorkoutOrganizer = () => {
         {/* Calendar View */}
         {currentView === 'calendar' && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-semibold text-gray-900">Calendário de Treinos</h2>
-            <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
-              <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-4">
-                {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
-                  <div key={day} className="text-center font-medium text-gray-700 p-2 text-xs sm:text-sm">
-                    {day}
-                  </div>
-                ))}
-              </div>
-              
-              <div className="grid grid-cols-7 gap-1 sm:gap-2">
-                {Array.from({ length: 35 }, (_, i) => {
-                  const date = new Date();
-                  date.setDate(date.getDate() - date.getDay() + i - 14);
-                  const dateStr = date.toISOString().split('T')[0];
-                  const hasWorkout = completedWorkouts.some(w => 
-                    w.completedAt.split('T')[0] === dateStr
-                  );
-                  
-                  return (
-                    <div
-                      key={i}
-                      className={`aspect-square p-1 sm:p-2 rounded-md flex items-center justify-center text-xs sm:text-sm font-medium transition-colors ${
-                        hasWorkout 
-                          ? 'bg-green-600 text-white' 
-                          : 'bg-gray-50 border border-gray-200 text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      {date.getDate()}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            <CalendarView 
+              completedWorkouts={completedWorkouts}
+              bodyAreas={bodyAreas}
+            />
           </div>
         )}
 
